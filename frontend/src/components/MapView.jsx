@@ -46,4 +46,3 @@ export default function MapView({ lots, center = [13.3379, 77.1173] }) {
     </MapContainer>
   );
 }
-cd 
