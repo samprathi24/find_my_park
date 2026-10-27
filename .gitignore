@@ -26,3 +26,5 @@ npm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+backend/app/ml/prediction/findmypark_preprocessor.pkl
+backend/app/ml/prediction/findmypark_xgboost.pkl
