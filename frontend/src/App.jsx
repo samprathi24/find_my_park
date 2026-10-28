@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
+import { fetchParkingLots } from "./api/parking";
 import MapView from "./components/MapView";
-import { parkingLots } from "./data/mockParking";
+
+const forecastDisclaimer =
+  "60-minute forecasts use the latest YOLO occupancy counts and Birmingham parking history.";
 
 function Brand() {
   return (
@@ -16,17 +19,56 @@ function Brand() {
 
 function App() {
   const [showMap, setShowMap] = useState(false);
-  const availableSlots = parkingLots.reduce(
-    (total, lot) => total + lot.freeSlots,
+  const [parkingLots, setParkingLots] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [forecastError, setForecastError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function refreshParkingLots() {
+      try {
+        const latestLots = await fetchParkingLots(controller.signal);
+        setParkingLots(latestLots);
+        setForecastError("");
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setForecastError(error.message);
+        }
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    refreshParkingLots();
+    const refreshInterval = window.setInterval(refreshParkingLots, 5000);
+
+    return () => {
+      controller.abort();
+      window.clearInterval(refreshInterval);
+    };
+  }, []);
+
+  const liveLots = parkingLots.filter(
+    (lot) => lot.detectionStatus === "live",
+  );
+  const hasDetectionData = parkingLots.some(
+    (lot) => lot.detectionStatus !== "waiting_for_yolo",
+  );
+  const predictedAvailableSlots = liveLots.reduce(
+    (total, lot) => total + lot.predictedFree,
     0,
   );
+  const featuredLot = liveLots[0] ?? parkingLots[0];
 
   if (showMap) {
     return (
       <main className="map-screen">
         <header className="map-header">
           <Brand />
-          <span className="map-heading">Parking around Tumakuru</span>
+          <span className="map-heading">Birmingham city centre parking</span>
           <button
             className="button button-secondary map-back"
             onClick={() => setShowMap(false)}
@@ -35,6 +77,23 @@ function App() {
             Back to home
           </button>
         </header>
+        <div className="forecast-notice" role="note">
+          {forecastDisclaimer}
+        </div>
+        <p className="forecast-source">
+          Grey markers are awaiting YOLO data. Counts older than five minutes
+          are marked stale.
+        </p>
+        {isLoading && (
+          <p className="forecast-status" role="status">
+            Loading demo forecasts…
+          </p>
+        )}
+        {forecastError && (
+          <p className="forecast-error" role="alert">
+            Could not load parking forecasts: {forecastError}
+          </p>
+        )}
         <div className="map-wrapper">
           <MapView lots={parkingLots} />
         </div>
@@ -73,8 +132,8 @@ function App() {
             <span>More time moving.</span>
           </h1>
           <p className="hero-description">
-            Find parking locations, compare listed spaces, and make your next
-            stop in Tumakuru a little easier.
+            Find Birmingham parking locations and see 60-minute availability
+            forecasts based on the latest occupancy detected by YOLO.
           </p>
           <div className="hero-actions">
             <button
@@ -91,22 +150,45 @@ function App() {
           <div className="availability-note">
             <span className="availability-icon" aria-hidden="true">i</span>
             <span>
-              Demo data: <strong>{availableSlots} spaces</strong> listed as
-              available
+              {isLoading
+                ? "Loading Birmingham parking locations…"
+                : forecastError
+                  ? "Parking data is unavailable."
+                  : liveLots.length === 0
+                    ? hasDetectionData
+                      ? "YOLO readings are stale; waiting for fresh detections."
+                      : "Waiting for YOLO occupancy detections."
+                    : (
+                      <>
+                        <strong>{predictedAvailableSlots} spaces</strong>{" "}
+                        predicted free in 60 minutes across {liveLots.length}{" "}
+                        locations with live detections
+                      </>
+                    )}
             </span>
           </div>
+          <p className="forecast-disclaimer">{forecastDisclaimer}</p>
+          {forecastError && (
+            <p className="forecast-error" role="alert">
+              Could not load parking forecasts: {forecastError}
+            </p>
+          )}
         </div>
 
         <div
           className="hero-visual"
           role="img"
-          aria-label="Preview of parking locations and sample availability in Tumakuru"
+          aria-label="Preview of Birmingham parking locations and YOLO availability"
         >
           <div className="visual-topline">
-            <span className="visual-label">PARKING IN TUMAKURU</span>
+            <span className="visual-label">BIRMINGHAM CITY CENTRE</span>
             <span className="live-badge">
               <span className="status-dot" aria-hidden="true" />
-              SAMPLE DATA
+              {liveLots.length > 0
+                ? "YOLO LIVE"
+                : hasDetectionData
+                  ? "YOLO DATA STALE"
+                  : "WAITING FOR YOLO"}
             </span>
           </div>
           <div className="preview-map" aria-hidden="true">
@@ -129,25 +211,35 @@ function App() {
             <span className="road road-one" />
             <span className="road road-two" />
             <span className="road road-three" />
-            <span className="map-place place-one">Tumakuru</span>
-            <span className="map-place place-two">SIT Campus</span>
-            <span className="map-place place-three">City Centre</span>
+            <span className="map-place place-one">Bull Ring</span>
+            <span className="map-place place-two">Arena Birmingham</span>
+            <span className="map-place place-three">Broad Street</span>
             <span className="map-pin pin-one"><i /></span>
             <span className="map-pin pin-two"><i /></span>
             <span className="map-pin pin-three"><i /></span>
             <span className="you-are-here">
-              <span /> YOU ARE HERE
+              <span /> BIRMINGHAM
             </span>
           </div>
           <div className="lot-preview">
             <span className="lot-icon" aria-hidden="true">P</span>
             <span className="lot-details">
-              <strong>Clock Tower Parking</strong>
-              <span>1.2 km away · City centre</span>
+              <strong>{featuredLot?.name ?? "Birmingham parking"}</strong>
+              <span>
+                {featuredLot
+                  ? featuredLot.detectionStatus === "live"
+                    ? `${featuredLot.currentOccupancy} occupied · YOLO live`
+                    : "Waiting for YOLO occupancy data"
+                  : "Loading Birmingham parking locations…"}
+              </span>
             </span>
             <span className="lot-spaces">
-              <strong>54</strong>
-              <span>open</span>
+              <strong>
+                {featuredLot?.detectionStatus === "live"
+                  ? featuredLot.predictedFree
+                  : "—"}
+              </strong>
+              <span>predicted free</span>
             </span>
           </div>
         </div>
@@ -182,7 +274,7 @@ function App() {
         <div>
           <p className="eyebrow">YOUR NEXT SPACE IS CLOSER</p>
           <h2>Ready to find a spot?</h2>
-          <p>Explore the parking map and see the listed locations.</p>
+          <p>Explore Birmingham parking and the latest YOLO-based forecasts.</p>
         </div>
         <button
           className="button button-light"
@@ -195,7 +287,7 @@ function App() {
 
       <footer className="landing-footer">
         <Brand />
-        <span>Parking made simpler in Tumakuru.</span>
+        <span>Parking made simpler in Birmingham.</span>
       </footer>
     </main>
   );

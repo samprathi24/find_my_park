@@ -200,6 +200,53 @@
   color: #344a3a;
 }
 
+.forecast-disclaimer,
+.forecast-notice {
+  color: #79612f;
+  background: #fff8e8;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.forecast-disclaimer {
+  max-width: 430px;
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  border-radius: 7px;
+}
+
+.forecast-notice {
+  padding: 8px 18px;
+  text-align: center;
+}
+
+.forecast-source {
+  margin: 0;
+  padding: 7px 18px;
+  color: #64748b;
+  background: #f8fafc;
+  font-size: 11px;
+  text-align: center;
+}
+
+.forecast-status,
+.forecast-error {
+  margin: 0;
+  padding: 8px 18px;
+  font-size: 12px;
+  text-align: center;
+}
+
+.forecast-status {
+  color: #536258;
+  background: #f7f9f6;
+}
+
+.forecast-error {
+  color: #8a2929;
+  background: #fff0ef;
+}
+
 .availability-icon {
   display: grid;
   place-items: center;
